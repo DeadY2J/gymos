@@ -61,14 +61,19 @@ export function evaluarSocio(socio: Socio, diasVisita: Dia[], hoy: Dia): Evaluac
   const hayPerfil = antiguedad >= cfg.minAntiguedadDias && visitas.size >= cfg.minVisitas;
   let habitual: number | null = null;
   if (hayPerfil) {
-    const finBase = sumarDias(hoy, -cfg.ventanaRecienteDias - 1);
+    // "Lo habitual" se mide antes de la ventana reciente y, si lleva tiempo sin venir, antes de la última
+    // visita: así una ausencia larga no rebaja su ritmo habitual (ni la señal).
+    const finVentana = sumarDias(hoy, -cfg.ventanaRecienteDias - 1);
+    const finBase = ultima && ultima < finVentana ? ultima : finVentana;
     const iniBase = sumarDias(finBase, -(cfg.ventanaBaseDias - 1));
     const iniReciente = sumarDias(hoy, -(cfg.ventanaRecienteDias - 1));
     // La ventana base solo cuenta desde el alta, para no penalizar a los socios recientes.
     const iniBaseReal = iniBase < socio.alta ? socio.alta : iniBase;
     const diasBase = diasEntre(iniBaseReal, finBase) + 1;
     if (diasBase >= 14) {
-      habitual = (contar(visitas, iniBaseReal, finBase) / diasBase) * 7;
+      // Si la ventana termina en la última visita, esa visita no cuenta (evita inflar el ritmo).
+      const enBase = contar(visitas, iniBaseReal, finBase) - (finBase === ultima ? 1 : 0);
+      habitual = (Math.max(0, enBase) / diasBase) * 7;
       const reciente = (contar(visitas, iniReciente, hoy) / cfg.ventanaRecienteDias) * 7;
       base.ritmoHabitual = habitual;
       base.ritmoReciente = reciente;

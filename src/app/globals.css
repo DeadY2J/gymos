@@ -38,3 +38,12 @@ h1, h2 { font-variation-settings: "opsz" 48; }
 @media (prefers-reduced-motion: reduce) {
   .barrido { animation: none; }
 }
+
+/* Resalta lo que acaba de cambiar (un socio que entra en el radar, el resultado de un escaneo). */
+@keyframes aparece { from { opacity: 0.2; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.aparece { animation: aparece 0.5s ease-out; }
+@keyframes recien { from { box-shadow: 0 0 0 4px rgb(168 67 31 / 0.55); } to { box-shadow: 0 0 0 0 rgb(168 67 31 / 0); } }
+.recien { animation: recien 1.6s ease-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .aparece, .recien { animation: none; }
+}
