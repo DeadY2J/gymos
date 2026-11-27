@@ -88,6 +88,8 @@ describe("Mercado Pago (simulado)", () => {
     expect(verificarFirmaWebhook(firmar("123", "req-1", ahora, "otro"), "req-1", "123", ahora)).toBe(false);
     expect(verificarFirmaWebhook(firmar("123", "req-1", ahora), "req-2", "123", ahora)).toBe(false);
     expect(verificarFirmaWebhook(firmar("123", "req-1", ahora - 3_600_000), "req-1", "123", ahora)).toBe(false);
+    expect(verificarFirmaWebhook(firmar("123", "req-1", Math.floor(ahora / 1000)), "req-1", "123", ahora)).toBe(true); // ts en segundos
+    expect(verificarFirmaWebhook(firmar("123", "req-1", Math.floor(ahora / 1000) - 3600), "req-1", "123", ahora)).toBe(false);
     expect(verificarFirmaWebhook("basura", "req-1", "123", ahora)).toBe(false);
     expect(verificarFirmaWebhook(null, "req-1", "123", ahora)).toBe(false);
     expect(leerReferencia("a:b:c")).toBeNull();

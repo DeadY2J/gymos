@@ -87,8 +87,9 @@ export function verificarFirmaWebhook(firma: string | null, idPeticion: string |
   const ts = partes.ts;
   const v1 = partes.v1;
   if (!ts || !v1 || !/^\d+$/.test(ts) || !/^[0-9a-f]{64}$/.test(v1)) return false;
-  // Rechaza notificaciones viejas (repetición). Mercado Pago envía ts en milisegundos.
-  if (Math.abs(ahoraMs - Number(ts)) > 10 * 60_000) return false;
+  // Rechaza notificaciones viejas (repetición). La documentación muestra ts en segundos; se aceptan también milisegundos.
+  const tsMs = ts.length <= 11 ? Number(ts) * 1000 : Number(ts);
+  if (Math.abs(ahoraMs - tsMs) > 10 * 60_000) return false;
   const manifiesto = `id:${idDato.toLowerCase()};request-id:${idPeticion};ts:${ts};`;
   const esperada = createHmac("sha256", secreto).update(manifiesto).digest();
   return timingSafeEqual(Buffer.from(v1, "hex"), esperada);
