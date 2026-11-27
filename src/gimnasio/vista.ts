@@ -8,6 +8,9 @@ import { redactarMensaje } from "./mensaje";
 import { rankingDelMes } from "./ranking";
 import { radarDeBajas } from "./riesgo";
 import { modoDemo } from "./seguridad";
+import { iaActiva } from "@/integraciones/ia";
+import { mercadoPagoActivo } from "@/integraciones/mercadopago";
+import { whatsappActivo } from "@/integraciones/whatsapp";
 
 export function panel() {
   const { hoy, socios, visitas } = almacen.estado();
@@ -35,6 +38,7 @@ export function panel() {
     hoyTexto: fechaLarga(hoy),
     desplazamiento: almacen.dias,
     modoDemo: modoDemo(),
+    integraciones: { mercadoPago: mercadoPagoActivo(), whatsapp: whatsappActivo(), ia: iaActiva() },
     gimnasio,
     planes,
     resumen: {
