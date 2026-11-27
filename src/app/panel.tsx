@@ -99,6 +99,12 @@ export function Panel() {
     return () => clearTimeout(t);
   }, [reproduciendo, datos, viajar]);
 
+  const [enlacePago, setEnlacePago] = useState<{ id: string; url: string } | null>(null);
+  async function linkDePago(id: string, planId: string) {
+    const r = await pedir("/api/pagos/enlace", { socioId: id, planId });
+    if (r?.url) setEnlacePago({ id, url: r.url });
+  }
+
   async function accion(ruta: string, cuerpo: unknown = {}) {
     const p = await pedir(ruta, cuerpo);
     if (p) aplicar(p);
@@ -183,7 +189,15 @@ export function Panel() {
           {visibles.length === 0 && <p className="mt-4 text-tinta-suave">Nadie en riesgo esta semana.</p>}
           <ul className="mt-3 space-y-2">
             {visibles.map((r) => (
-              <FilaSocio key={r.socioId} r={r} abierto={abierto === r.socioId} recien={cambiados.has(r.socioId)} onAbrir={() => setAbierto(abierto === r.socioId ? null : r.socioId)} onEnviado={() => accion(`/api/socios/${encodeURIComponent(r.socioId)}/contacto`)} />
+              <FilaSocio
+                key={r.socioId}
+                r={r}
+                abierto={abierto === r.socioId}
+                recien={cambiados.has(r.socioId)}
+                onAbrir={() => setAbierto(abierto === r.socioId ? null : r.socioId)}
+                onEnviado={() => accion(`/api/socios/${encodeURIComponent(r.socioId)}/contacto`)}
+                onPlantilla={datos.integraciones.whatsapp ? () => accion(`/api/socios/${encodeURIComponent(r.socioId)}/whatsapp`) : undefined}
+              />
             ))}
           </ul>
         </section>
@@ -195,7 +209,7 @@ export function Panel() {
             {datos.porCobrar.length === 0 && <p className="mt-2 text-sm text-tinta-suave">No hay cuotas por vencer.</p>}
             <ul className="mt-2 divide-y divide-salvia">
               {datos.porCobrar.slice(0, 8).map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className="font-medium">{c.nombre}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs ${c.estado === "vencida" || c.estado === "en_gracia" ? "bg-alerta/10 text-alerta" : "bg-ambar/15 text-ambar"}`}>{textoCuota[c.estado]} · {c.vencimiento.split("-").reverse().join("/")}</span>
@@ -203,6 +217,14 @@ export function Panel() {
                   <button type="button" onClick={() => accion(`/api/socios/${encodeURIComponent(c.id)}/renovar`, { planId: c.planId })} className="shrink-0 rounded-lg border border-bosque px-3 py-1 font-semibold text-bosque hover:bg-salvia">
                     Cobrar y renovar
                   </button>
+                  {datos.integraciones.mercadoPago && (
+                    <button type="button" onClick={() => linkDePago(c.id, c.planId)} className="shrink-0 rounded-lg bg-jacaranda px-3 py-1 font-semibold text-white hover:opacity-90">
+                      Link de pago
+                    </button>
+                  )}
+                  {enlacePago?.id === c.id && (
+                    <a href={enlacePago.url} target="_blank" rel="noopener noreferrer" className="basis-full break-all text-xs text-jacaranda underline">{enlacePago.url}</a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -242,7 +264,7 @@ function Cifra({ titulo, valor, destacado }: { titulo: string; valor: number; de
   );
 }
 
-function FilaSocio({ r, abierto, recien, onAbrir, onEnviado }: { r: FilaRadar; abierto: boolean; recien: boolean; onAbrir: () => void; onEnviado: () => void }) {
+function FilaSocio({ r, abierto, recien, onAbrir, onEnviado, onPlantilla }: { r: FilaRadar; abierto: boolean; recien: boolean; onAbrir: () => void; onEnviado: () => void; onPlantilla?: () => void }) {
   const e = estiloNivel[r.nivel];
   const idDetalle = `detalle-${r.socioId}`;
   return (
@@ -284,6 +306,11 @@ function FilaSocio({ r, abierto, recien, onAbrir, onEnviado }: { r: FilaRadar; a
             <button type="button" onClick={onEnviado} className="rounded-lg border border-bosque bg-white px-3 py-1.5 text-sm font-semibold text-bosque hover:bg-salvia">
               Marcar como enviado
             </button>
+            {onPlantilla && (
+              <button type="button" onClick={onPlantilla} className="rounded-lg border border-bosque bg-white px-3 py-1.5 text-sm font-semibold text-bosque hover:bg-salvia">
+                Enviar plantilla aprobada por la API
+              </button>
+            )}
           </div>
         </div>
       )}

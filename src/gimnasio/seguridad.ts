@@ -68,3 +68,10 @@ export function rechazo(req: Request, max = 60): Response | null {
   if (!limitar(`${new URL(req.url).pathname}:${ipDe(req)}`, max, 60_000)) return Response.json({ error: "Demasiadas peticiones, espera un momento." }, { status: 429 });
   return null;
 }
+
+/** Origen público para los enlaces (webhooks, vuelta de Mercado Pago): GYMOS_URL_PUBLICA o el de la petición. */
+export function origenPublico(req: Request): string {
+  const configurado = process.env.GYMOS_URL_PUBLICA?.trim().replace(/\/$/, "");
+  if (configurado && /^https:\/\//.test(configurado)) return configurado;
+  return new URL(req.url).origin;
+}

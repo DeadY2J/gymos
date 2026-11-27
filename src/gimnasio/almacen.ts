@@ -60,13 +60,22 @@ class Almacen {
     this.escaneos.set(socioId, dias);
   }
 
-  renovar(socioId: string, planId: string): Socio | undefined {
+  private pagosProcesados = new Set<string>();
+
+  /** Idempotencia de los webhooks: true la primera vez que se ve un pago, false las siguientes. */
+  marcarPagoProcesado(id: string): boolean {
+    if (this.pagosProcesados.has(id)) return false;
+    this.pagosProcesados.add(id);
+    return true;
+  }
+
+  renovar(socioId: string, planId: string, medio: Pago["medio"] = "efectivo"): Socio | undefined {
     const socio = this.socio(socioId);
     const plan = planes.find((p) => p.id === planId);
     if (!socio || !plan) return undefined;
     const nuevo = renovar(socio, plan, this.hoy());
     this.renovados.set(socioId, nuevo);
-    this.pagos.push({ socioId, dia: this.hoy(), importe: plan.precio, medio: "efectivo" });
+    this.pagos.push({ socioId, dia: this.hoy(), importe: plan.precio, medio });
     return nuevo;
   }
 
@@ -97,6 +106,7 @@ class Almacen {
     this.contactos.clear();
     this.enviadosPorDia.clear();
     this.pagos = [];
+    this.pagosProcesados.clear();
   }
 }
 
