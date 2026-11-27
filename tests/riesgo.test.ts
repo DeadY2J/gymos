@@ -17,6 +17,13 @@ describe("Radar de bajas", () => {
     expect(ev.senales[0].texto).toMatch(/^Hace 24 días que no viene; lo habitual era venir cada 2(,\d)? días\.$/);
   });
 
+  it("lo habitual no se diluye cuanto más tiempo lleva sin venir", () => {
+    const dias = visitas("2026-06-02", "2026-10-01", 2);
+    const ev = evaluarSocio(socio(), dias, HOY);
+    expect(ev.ritmoHabitual).toBeCloseTo(3.5, 0);
+    expect(ev.senales.find((s) => s.id === "ausencia")?.puntos).toBe(40);
+  });
+
   it("detecta una caída gradual aunque siga viniendo", () => {
     const dias = [...visitas("2026-06-02", "2026-10-26", 2), ...visitas("2026-11-05", "2026-11-26", 9)];
     const ev = evaluarSocio(socio(), dias, HOY);
