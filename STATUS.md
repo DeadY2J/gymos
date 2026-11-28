@@ -2,6 +2,13 @@
 
 Revisión del 27/11/2026.
 
+## Revisión del 28/11/2026 (test de humo)
+- `npm run test:humo` (Playwright 1.63, tras `npm run build`): arranca la app compilada en modo demo y recorre en
+  escritorio y móvil la carga con CSP y sin errores, el acceso que pasa y el que no, la máquina del tiempo con el
+  mensaje de Valentina, una rutina y el modo presentación con su reinicio. 10 de 10 en verde.
+- No está en la CI todavía (necesita `npx playwright install chromium` en el runner). En local, la primera vez,
+  `npx playwright install chromium`.
+
 ## Revisión del 28/11/2026 (modo presentación)
 - Botón «Modo presentación (60 s)» en la cabecera (solo en modo demo): reinicia la demo y ejecuta el guion de
   PROSPECCION.md con datos precargados: Martina pasa, Lucía no (cuota vencida), seis semanas de máquina del tiempo,
@@ -49,4 +56,5 @@ Revisión del 27/11/2026.
 npm ci
 npm run dev        # http://localhost:3000, modo demo sin claves
 npm test && npm run typecheck && npm run build
+npm run test:humo   # test de humo en navegador (tras el build)
 ```
