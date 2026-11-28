@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Rutina } from "@/gimnasio/rutinas";
 
 const zonas = [
@@ -9,7 +9,7 @@ const zonas = [
   { id: "espalda_baja", nombre: "Espalda baja" },
 ] as const;
 
-export function Rutinas({ cabeceras, alGenerar }: { cabeceras: () => HeadersInit; alGenerar: (r: Rutina | null, error?: string) => void }) {
+export function Rutinas({ cabeceras, alGenerar, pedido = 0 }: { cabeceras: () => HeadersInit; alGenerar: (r: Rutina | null, error?: string) => void; pedido?: number }) {
   const [objetivo, setObjetivo] = useState("ganar_musculo");
   const [nivel, setNivel] = useState("principiante");
   const [dias, setDias] = useState(3);
@@ -18,8 +18,14 @@ export function Rutinas({ cabeceras, alGenerar }: { cabeceras: () => HeadersInit
   const [rutina, setRutina] = useState<Rutina | null>(null);
   const [cargando, setCargando] = useState(false);
 
-  async function generar(e: React.FormEvent) {
-    e.preventDefault();
+  // El modo presentación pide una rutina con los valores que haya en el formulario.
+  const generarRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (pedido > 0) generarRef.current();
+  }, [pedido]);
+
+  async function generar(e?: React.FormEvent) {
+    e?.preventDefault();
     setCargando(true);
     const res = await fetch("/api/rutina", { method: "POST", headers: cabeceras(), body: JSON.stringify({ objetivo, nivel, diasPorSemana: dias, minutos, cuidar }) });
     const json = await res.json().catch(() => ({}));
@@ -29,9 +35,11 @@ export function Rutinas({ cabeceras, alGenerar }: { cabeceras: () => HeadersInit
     alGenerar(json);
   }
 
+  generarRef.current = generar;
+
   const campo = "mt-1 border-2 border-tinta bg-hormigon-claro px-3 py-2";
   return (
-    <section aria-labelledby="t-rutinas" className="mt-12">
+    <section aria-labelledby="t-rutinas" className="mt-12 scroll-mt-4">
       <h2 id="t-rutinas" className="marcador border-b-[6px] border-tinta pb-2 text-6xl">Rutina personalizada</h2>
       <form onSubmit={generar} className="mt-3 flex flex-wrap items-end gap-3">
         <label className="flex flex-col text-sm font-semibold">

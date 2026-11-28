@@ -2,6 +2,15 @@
 
 Revisión del 27/11/2026.
 
+## Revisión del 28/11/2026 (modo presentación)
+- Botón «Modo presentación (60 s)» en la cabecera (solo en modo demo): reinicia la demo y ejecuta el guion de
+  PROSPECCION.md con datos precargados: Martina pasa, Lucía no (cuota vencida), seis semanas de máquina del tiempo,
+  mensaje de Valentina, ranking y una rutina. Barra inferior con el texto del guion, el segundo y los botones
+  Detener, Reiniciar y Cerrar.
+- El guion vive como datos puros en `src/gimnasio/guion.ts`, con su test (orden, 60 s, socios existentes, español neutro).
+- Comprobado: typecheck, 68 tests y build en verde; recorrido completo con Playwright sin errores de consola y axe sin
+  incidencias al terminar. Con `prefers-reduced-motion` el desplazamiento es instantáneo. No desplegado.
+
 ## Revisión del 28/11/2026 (rediseño visual)
 - Identidad propia de GymOS: gris hormigón con grano, azul eléctrico y naranja de seguridad; Big Shoulders Display
   (condensada, cifras enormes) y Archivo, ambas OFL y alojadas en el proyecto. Se retira Bricolage Grotesque.
