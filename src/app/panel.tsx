@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Panel as DatosPanel } from "@/gimnasio/vista";
 import type { Rutina } from "@/gimnasio/rutinas";
+import { DURACION_GUION, guion, textoEn, type AccionGuion } from "@/gimnasio/guion";
 import { Cronometro } from "./cronometro";
 import { Rutinas } from "./rutinas";
 
 type FilaRadar = DatosPanel["radar"][number];
 type Decision = { permitido: boolean; mensaje: string; estado?: string; socio?: { nombre: string } };
 type Qr = { codigo: string; svg: string; caducaEnSeg: number; nombre: string };
+type Orden = { tipo: "escanear" | "limpiar"; n: number };
 
 const SEMANAS = [0, 1, 2, 3, 4, 5, 6];
 const VALIDEZ_QR = 60;
@@ -42,6 +44,9 @@ export function Panel() {
   const [verTodos, setVerTodos] = useState(false);
   const [cambiados, setCambiados] = useState<Set<string>>(new Set());
   const anterior = useRef<Map<string, string>>(new Map());
+  const [socioPuerta, setSocioPuerta] = useState("martina-rojas");
+  const [orden, setOrden] = useState<Orden>({ tipo: "limpiar", n: 0 });
+  const [pedidoRutina, setPedidoRutina] = useState(0);
 
   const cabeceras = useCallback((): HeadersInit => ({ "Content-Type": "application/json", ...(token ? { "x-gymos-token": token } : {}) }), [token]);
 
@@ -114,6 +119,61 @@ export function Panel() {
     if (p) aplicar(p);
   }
 
+  // Modo presentación: ejecuta el guion de 60 s de PROSPECCION.md sobre los datos de la demo.
+  const [presentando, setPresentando] = useState(false);
+  const [segundo, setSegundo] = useState(0);
+  const hechos = useRef(-1);
+  const ejecutar = useRef<(a: AccionGuion) => void>(() => {});
+  ejecutar.current = (a: AccionGuion) => {
+    const suave: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    const ir = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: suave, block: "start" });
+    if (a.tipo === "ir") return a.destino === "inicio" ? window.scrollTo({ top: 0, behavior: suave }) : ir(a.destino);
+    if (a.tipo === "socio") return setSocioPuerta(a.id);
+    if (a.tipo === "escanear" || a.tipo === "limpiar") return setOrden((o) => ({ tipo: a.tipo as Orden["tipo"], n: o.n + 1 }));
+    if (a.tipo === "semana") return viajar(a.n);
+    if (a.tipo === "rutina") return setPedidoRutina((n) => n + 1);
+    if (a.tipo === "mensaje") {
+      setVerTodos(false);
+      setAbierto(a.id);
+      setTimeout(() => ir(`socio-${a.id}`), 120);
+    }
+  };
+
+  useEffect(() => {
+    if (!presentando) return;
+    const inicio = Date.now();
+    const t = setInterval(() => {
+      const s = (Date.now() - inicio) / 1000;
+      setSegundo(Math.min(s, DURACION_GUION));
+      while (hechos.current + 1 < guion.length && guion[hechos.current + 1].seg <= s) {
+        hechos.current += 1;
+        ejecutar.current(guion[hechos.current].accion);
+      }
+      if (s >= DURACION_GUION) {
+        clearInterval(t);
+        setPresentando(false);
+      }
+    }, 200);
+    return () => clearInterval(t);
+  }, [presentando]);
+
+  async function prepararEscena() {
+    setPresentando(false);
+    setReproduciendo(false);
+    setAbierto(null);
+    setVerTodos(false);
+    setSocioPuerta("martina-rojas");
+    setOrden((o) => ({ tipo: "limpiar", n: o.n + 1 }));
+    hechos.current = -1;
+    setSegundo(0);
+    await accion("/api/demo/reiniciar");
+  }
+
+  async function presentar() {
+    await prepararEscena();
+    setPresentando(true);
+  }
+
   if (!datos) {
     return (
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -129,7 +189,7 @@ export function Panel() {
   const visibles = verTodos ? datos.radar : enRiesgo;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-10 sm:px-6">
+    <main id="inicio" className={`mx-auto max-w-7xl px-4 sm:px-6 ${presentando || segundo > 0 ? "pb-48" : "pb-10"}`}>
       {/* Cabecera: el nombre del gimnasio a tamaño de rótulo de nave industrial. */}
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b-[6px] border-tinta pb-3 pt-5">
         <div>
@@ -139,14 +199,21 @@ export function Panel() {
           </p>
           <h1 className="marcador mt-1 text-[clamp(3.5rem,11vw,8.5rem)]">{datos.gimnasio.nombre}</h1>
         </div>
-        {datos.modoDemo && <span className="bg-tinta px-3 py-1 text-sm font-semibold text-hormigon-claro">Modo demo con socios ficticios</span>}
+        {datos.modoDemo && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold text-tinta-suave">Modo demo con socios ficticios</span>
+            <button type="button" onClick={presentar} disabled={presentando} className="bg-tinta px-4 py-2 font-bold text-hormigon-claro hover:bg-azul disabled:opacity-60">
+              Modo presentación (60 s)
+            </button>
+          </div>
+        )}
       </header>
 
       {!datos.modoDemo && <ClaveAcceso token={token} onCambio={setToken} onGuardar={cargar} />}
 
       {/* Héroe: la puerta del gimnasio. QR que gira con su cronómetro y el marcador del día. */}
       <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]" aria-label="Acceso y marcador del día">
-        <Recepcion socios={datos.socios} cabeceras={cabeceras} onCambio={cargar} />
+        <Recepcion socios={datos.socios} cabeceras={cabeceras} onCambio={cargar} socioId={socioPuerta} onSocio={setSocioPuerta} orden={orden} />
         <dl className="grid grid-cols-2 content-start gap-x-6 gap-y-5">
           <div className="col-span-2 border-b-2 border-tinta/25 pb-4">
             <dt className="font-semibold text-tinta-suave">Socios activos</dt>
@@ -171,8 +238,8 @@ export function Panel() {
         <section aria-labelledby="t-tiempo" className="sobre-oscuro mt-8 bg-asfalto px-4 py-5 text-hormigon-claro sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-xl">
-              <h2 id="t-tiempo" className="marcador text-5xl">Máquina del tiempo</h2>
-              <p className="mt-2 text-hormigon">Avanza el calendario y mira cómo el radar detecta a quien empieza a faltar.</p>
+              <h2 id="t-tiempo" className="scroll-mt-10 marcador text-5xl">Máquina del tiempo</h2>
+              <p className="mt-2 text-hormigon">Avanza el calendario y observa cómo el radar detecta a quien empieza a faltar.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setReproduciendo((r) => !r)} className="bg-naranja px-5 py-3 font-bold text-tinta hover:bg-hormigon-claro" aria-pressed={reproduciendo}>
@@ -207,7 +274,7 @@ export function Panel() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <section aria-labelledby="t-radar">
           <div className="flex flex-wrap items-end justify-between gap-2 border-b-[6px] border-tinta pb-2">
-            <h2 id="t-radar" className="marcador text-6xl">Radar de bajas</h2>
+            <h2 id="t-radar" className="scroll-mt-6 marcador text-6xl">Radar de bajas</h2>
             <button type="button" onClick={() => setVerTodos((v) => !v)} className="font-semibold text-azul underline decoration-2 underline-offset-4 hover:text-tinta">
               {verTodos ? "Ver solo en riesgo" : `Ver a todos (${datos.radar.length})`}
             </button>
@@ -260,7 +327,7 @@ export function Panel() {
           </section>
 
           <section aria-labelledby="t-ranking">
-            <h2 id="t-ranking" className="marcador border-b-[6px] border-tinta pb-2 text-4xl">Ranking del mes</h2>
+            <h2 id="t-ranking" className="scroll-mt-6 marcador border-b-[6px] border-tinta pb-2 text-4xl">Ranking del mes</h2>
             <p className="mt-2 text-sm text-tinta-suave">Por constancia, no por fuerza. Solo quien aceptó salir, con su apodo.</p>
             <ol className="mt-3">
               {datos.ranking.map((f) => (
@@ -278,7 +345,11 @@ export function Panel() {
         </div>
       </div>
 
-      <Rutinas cabeceras={cabeceras} alGenerar={(r: Rutina | null, e?: string) => (e ? setError(e) : r && setError(null))} />
+      <Rutinas pedido={pedidoRutina} cabeceras={cabeceras} alGenerar={(r: Rutina | null, e?: string) => (e ? setError(e) : r && setError(null))} />
+
+      {datos.modoDemo && (presentando || segundo > 0) && (
+        <Presentacion segundo={segundo} presentando={presentando} onDetener={() => setPresentando(false)} onReiniciar={prepararEscena} onSalir={() => { setPresentando(false); setSegundo(0); }} />
+      )}
 
       <footer className="mt-12 border-t-2 border-tinta/25 pt-4 text-sm text-tinta-suave">
         GymOS, de la Fábrica. Los mensajes se envían a mano, de uno en uno. {datos.modoDemo ? "Datos ficticios de demostración." : ""}
@@ -291,7 +362,7 @@ function FilaSocio({ r, abierto, recien, onAbrir, onEnviado, onPlantilla }: { r:
   const e = estiloNivel[r.nivel];
   const idDetalle = `detalle-${r.socioId}`;
   return (
-    <li className={`relative border-b-2 border-tinta/15 py-3 pl-5 ${recien ? "recien" : ""}`}>
+    <li id={`socio-${r.socioId}`} className={`relative scroll-mt-4 border-b-2 border-tinta/15 py-3 pl-5 ${recien ? "recien" : ""}`}>
       <span className={`absolute inset-y-2 left-0 w-2 ${e.franja}`} aria-hidden />
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -347,8 +418,7 @@ function FilaSocio({ r, abierto, recien, onAbrir, onEnviado, onPlantilla }: { r:
 }
 
 /** La puerta del gimnasio: QR del socio que gira cada minuto con su cronómetro, y el escáner de la entrada. */
-function Recepcion({ socios, cabeceras, onCambio }: { socios: { id: string; nombre: string }[]; cabeceras: () => HeadersInit; onCambio: () => void }) {
-  const [socioId, setSocioId] = useState("martina-rojas");
+function Recepcion({ socios, cabeceras, onCambio, socioId, onSocio, orden }: { socios: { id: string; nombre: string }[]; cabeceras: () => HeadersInit; onCambio: () => void; socioId: string; onSocio: (id: string) => void; orden: Orden }) {
   const [qr, setQr] = useState<Qr | null>(null);
   const [vuelta, setVuelta] = useState(0);
   const [restante, setRestante] = useState(0);
@@ -385,6 +455,15 @@ function Recepcion({ socios, cabeceras, onCambio }: { socios: { id: string; nomb
     return () => clearInterval(t);
   }, []);
 
+  // Órdenes del modo presentación: escanear el QR que se ve o volver a mostrarlo.
+  const escanearRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (orden.n === 0) return;
+    if (orden.tipo === "escanear") escanearRef.current();
+    else setDecision(null);
+  }, [orden]);
+  useEffect(() => setDecision(null), [socioId]);
+
   async function escanear() {
     if (!qr) return;
     setCargando(true);
@@ -394,6 +473,7 @@ function Recepcion({ socios, cabeceras, onCambio }: { socios: { id: string; nomb
     setCargando(false);
     onCambio();
   }
+  escanearRef.current = escanear;
 
   return (
     <section aria-labelledby="t-recepcion" className="sobre-oscuro bg-asfalto p-4 text-hormigon-claro sm:p-6">
@@ -424,7 +504,7 @@ function Recepcion({ socios, cabeceras, onCambio }: { socios: { id: string; nomb
           </p>
           <label className="flex flex-col text-sm font-semibold">
             Socio en la puerta
-            <select value={socioId} onChange={(e) => { setSocioId(e.target.value); setDecision(null); }} className="mt-1 border-2 border-hormigon-medio bg-asfalto-claro px-3 py-2 text-base text-hormigon-claro">
+            <select value={socioId} onChange={(e) => onSocio(e.target.value)} className="mt-1 border-2 border-hormigon-medio bg-asfalto-claro px-3 py-2 text-base text-hormigon-claro">
               {socios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
             </select>
           </label>
@@ -462,5 +542,26 @@ function ClaveAcceso({ token, onCambio, onGuardar }: { token: string; onCambio: 
       </label>
       <button type="submit" className="bg-tinta px-4 py-2.5 font-bold text-hormigon-claro">Entrar</button>
     </form>
+  );
+}
+
+/** Barra del modo presentación: el texto del guion, el tiempo y los controles. */
+function Presentacion({ segundo, presentando, onDetener, onReiniciar, onSalir }: { segundo: number; presentando: boolean; onDetener: () => void; onReiniciar: () => void; onSalir: () => void }) {
+  const texto = textoEn(segundo);
+  return (
+    <section aria-label="Modo presentación" className="sobre-oscuro fixed inset-x-0 bottom-0 z-20 bg-tinta text-hormigon-claro">
+      <div className="h-2 bg-asfalto-claro" aria-hidden>
+        <div className="h-full bg-naranja" style={{ width: `${(segundo / DURACION_GUION) * 100}%` }} />
+      </div>
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4 sm:px-6">
+        <span className="marcador w-20 shrink-0 text-6xl tabular-nums" aria-label={`Segundo ${Math.floor(segundo)} de ${DURACION_GUION}`}>{Math.floor(segundo)}</span>
+        <p aria-live="polite" className="min-w-0 flex-1 basis-64 text-xl font-semibold sm:text-2xl">{presentando || segundo < DURACION_GUION ? texto : "Fin de la presentación."}</p>
+        <div className="flex flex-wrap gap-2">
+          {presentando && <button type="button" onClick={onDetener} className="border-2 border-hormigon-medio px-4 py-2 font-bold hover:bg-asfalto-claro">Detener</button>}
+          <button type="button" onClick={onReiniciar} className="bg-naranja px-4 py-2 font-bold text-tinta hover:bg-hormigon-claro">Reiniciar</button>
+          {!presentando && <button type="button" onClick={onSalir} className="border-2 border-hormigon-medio px-4 py-2 font-bold hover:bg-asfalto-claro">Cerrar</button>}
+        </div>
+      </div>
+    </section>
   );
 }
