@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { connection } from "next/server";
 import "./globals.css";
 
-// Bricolage Grotesque (OFL), alojada en el proyecto: sin dependencia de Google Fonts.
-const texto = localFont({ src: "./fuentes/bricolage-grotesque-latin-opsz-normal.woff2", variable: "--font-bricolage", weight: "200 800", display: "swap" });
-const cifras = localFont({ src: "./fuentes/bricolage-grotesque-latin-wdth-normal.woff2", variable: "--font-cifras", weight: "200 800", display: "swap" });
+// Tipografías OFL alojadas en el proyecto (sin Google Fonts):
+// Big Shoulders Display, condensada y de pizarra deportiva, para cifras y títulos; Archivo (eje de anchura) para el texto.
+const marcador = localFont({ src: "./fuentes/big-shoulders-display-latin-wght-normal.woff2", variable: "--font-marcador", weight: "100 900", display: "swap" });
+const texto = localFont({ src: "./fuentes/archivo-latin-wdth-normal.woff2", variable: "--font-texto", weight: "100 900", display: "swap" });
 
 export const metadata: Metadata = {
   title: "GymOS",
@@ -13,11 +14,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const viewport: Viewport = { themeColor: "#2a2d30" };
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Render dinámico: la CSP lleva un nonce nuevo en cada petición (ver src/proxy.ts).
   await connection();
   return (
-    <html lang="es" className={`${texto.variable} ${cifras.variable}`}>
+    <html lang="es" className={`${marcador.variable} ${texto.variable}`}>
       <body>{children}</body>
     </html>
   );

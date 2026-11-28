@@ -29,12 +29,12 @@ export function Rutinas({ cabeceras, alGenerar }: { cabeceras: () => HeadersInit
     alGenerar(json);
   }
 
-  const campo = "mt-1 rounded-lg border border-salvia-borde bg-papel px-3 py-2";
+  const campo = "mt-1 border-2 border-tinta bg-hormigon-claro px-3 py-2";
   return (
-    <section aria-labelledby="t-rutinas" className="mt-6 rounded-2xl border border-salvia-borde bg-white p-4">
-      <h2 id="t-rutinas" className="text-xl font-bold text-bosque">Rutina personalizada</h2>
+    <section aria-labelledby="t-rutinas" className="mt-12">
+      <h2 id="t-rutinas" className="marcador border-b-[6px] border-tinta pb-2 text-6xl">Rutina personalizada</h2>
       <form onSubmit={generar} className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col text-sm font-medium">
+        <label className="flex flex-col text-sm font-semibold">
           Objetivo
           <select value={objetivo} onChange={(e) => setObjetivo(e.target.value)} className={campo}>
             <option value="ganar_musculo">Ganar músculo</option>
@@ -42,7 +42,7 @@ export function Rutinas({ cabeceras, alGenerar }: { cabeceras: () => HeadersInit
             <option value="salud_general">Salud general</option>
           </select>
         </label>
-        <label className="flex flex-col text-sm font-medium">
+        <label className="flex flex-col text-sm font-semibold">
           Nivel
           <select value={nivel} onChange={(e) => setNivel(e.target.value)} className={campo}>
             <option value="principiante">Principiante</option>
@@ -50,48 +50,48 @@ export function Rutinas({ cabeceras, alGenerar }: { cabeceras: () => HeadersInit
             <option value="avanzado">Avanzado</option>
           </select>
         </label>
-        <label className="flex flex-col text-sm font-medium">
+        <label className="flex flex-col text-sm font-semibold">
           Días por semana
           <select value={dias} onChange={(e) => setDias(Number(e.target.value))} className={campo}>
             {[2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </label>
-        <label className="flex flex-col text-sm font-medium">
+        <label className="flex flex-col text-sm font-semibold">
           Minutos
           <select value={minutos} onChange={(e) => setMinutos(Number(e.target.value))} className={campo}>
             {[30, 45, 60, 90].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </label>
         <fieldset className="text-sm">
-          <legend className="font-medium">Cuidar</legend>
-          <div className="mt-1 flex gap-3">
+          <legend className="font-semibold">Cuidar</legend>
+          <div className="mt-1 flex flex-wrap gap-3 py-2">
             {zonas.map((z) => (
               <label key={z.id} className="flex items-center gap-1">
-                <input type="checkbox" checked={cuidar.includes(z.id)} onChange={(e) => setCuidar((c) => (e.target.checked ? [...c, z.id] : c.filter((x) => x !== z.id)))} />
+                <input type="checkbox" className="h-4 w-4 accent-azul" checked={cuidar.includes(z.id)} onChange={(e) => setCuidar((c) => (e.target.checked ? [...c, z.id] : c.filter((x) => x !== z.id)))} />
                 {z.nombre}
               </label>
             ))}
           </div>
         </fieldset>
-        <button type="submit" disabled={cargando} className="rounded-lg bg-jacaranda px-4 py-2 font-semibold text-white hover:opacity-90 disabled:opacity-70">
+        <button type="submit" disabled={cargando} className="bg-azul px-5 py-2.5 font-bold text-white hover:bg-tinta disabled:opacity-60">
           {cargando ? "Generando…" : "Generar rutina"}
         </button>
       </form>
       {rutina && (
         <div className="aparece mt-4">
-          <h3 className="font-bold">{rutina.titulo}</h3>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <h3 className="marcador-fino text-3xl">{rutina.titulo}</h3>
+          <ol className="mt-3 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             {rutina.dias.map((d, i) => (
-              <div key={i} className="rounded-xl bg-papel p-3">
-                <h4 className="font-semibold text-bosque">Día {i + 1} · {d.titulo}</h4>
-                <ul className="mt-1 space-y-0.5 text-sm">
-                  {d.ejercicios.map((e) => <li key={e.id}>{e.nombre} <span className="cifra text-tinta-suave">{e.series}×{e.repeticiones}</span></li>)}
+              <li key={i} className="losa p-4">
+                <h4 className="flex items-baseline gap-3"><span className="marcador text-5xl text-azul"><span className="sr-only">Día </span>{i + 1}</span><span className="font-bold">{d.titulo}</span></h4>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {d.ejercicios.map((e) => <li key={e.id} className="flex justify-between gap-3"><span>{e.nombre}</span><span className="marcador-fino shrink-0 text-lg">{e.series}×{e.repeticiones}</span></li>)}
                   <li className="text-tinta-suave">Cardio: {d.cardioMin} min</li>
                 </ul>
-              </div>
+              </li>
             ))}
-          </div>
-          <ul className="mt-2 list-inside list-disc text-xs text-tinta-suave">{rutina.notas.map((n) => <li key={n}>{n}</li>)}</ul>
+          </ol>
+          <ul className="mt-3 list-inside list-disc text-sm text-tinta-suave">{rutina.notas.map((n) => <li key={n}>{n}</li>)}</ul>
         </div>
       )}
     </section>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Panel as DatosPanel } from "@/gimnasio/vista";
 import type { Rutina } from "@/gimnasio/rutinas";
+import { Cronometro } from "./cronometro";
 import { Rutinas } from "./rutinas";
 
 type FilaRadar = DatosPanel["radar"][number];
@@ -10,16 +11,19 @@ type Decision = { permitido: boolean; mensaje: string; estado?: string; socio?: 
 type Qr = { codigo: string; svg: string; caducaEnSeg: number; nombre: string };
 
 const SEMANAS = [0, 1, 2, 3, 4, 5, 6];
+const VALIDEZ_QR = 60;
 
-const estiloNivel: Record<FilaRadar["nivel"], { chip: string; barra: string; texto: string }> = {
-  alto: { chip: "bg-alerta text-white", barra: "bg-alerta", texto: "Riesgo alto" },
-  medio: { chip: "bg-ambar/15 text-ambar", barra: "bg-ambar", texto: "Riesgo medio" },
-  bajo: { chip: "bg-salvia text-bosque", barra: "bg-bosque-claro", texto: "Constante" },
-  sin_datos: { chip: "bg-papel text-tinta-suave border border-salvia-borde", barra: "bg-salvia-borde", texto: "Sin datos" },
-  congelado: { chip: "bg-jacaranda-claro text-jacaranda", barra: "bg-jacaranda", texto: "Congelado" },
+const estiloNivel: Record<FilaRadar["nivel"], { franja: string; barra: string; texto: string; cifra: string }> = {
+  alto: { franja: "bg-naranja", barra: "bg-naranja", texto: "Riesgo alto", cifra: "text-naranja-texto" },
+  medio: { franja: "bg-naranja/45", barra: "bg-naranja/60", texto: "Riesgo medio", cifra: "text-tinta" },
+  bajo: { franja: "bg-azul", barra: "bg-azul", texto: "Constante", cifra: "text-tinta-suave" },
+  sin_datos: { franja: "bg-hormigon-medio", barra: "bg-hormigon-medio", texto: "Sin datos", cifra: "text-tinta-suave" },
+  congelado: { franja: "bg-azul-claro", barra: "bg-azul-claro", texto: "Congelado", cifra: "text-tinta-suave" },
 };
 
 const textoCuota: Record<string, string> = { al_dia: "Al día", por_vencer: "Por vencer", en_gracia: "En gracia", vencida: "Vencida", congelada: "Congelada" };
+
+const fecha = (iso: string) => iso.split("-").reverse().join("/");
 
 function leerToken(): string {
   try {
@@ -112,8 +116,9 @@ export function Panel() {
 
   if (!datos) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <p role="status" aria-live="polite" className="text-tinta-suave">{error ?? "Cargando el panel…"}</p>
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+        <p className="marcador text-6xl">GymOS</p>
+        <p role="status" aria-live="polite" className="mt-4 text-tinta-suave">{error ?? "Cargando el panel…"}</p>
         {error && <ClaveAcceso token={token} onCambio={setToken} onGuardar={cargar} />}
       </main>
     );
@@ -124,70 +129,92 @@ export function Panel() {
   const visibles = verTodos ? datos.radar : enRiesgo;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <main className="mx-auto max-w-7xl px-4 pb-10 sm:px-6">
+      {/* Cabecera: el nombre del gimnasio a tamaño de rótulo de nave industrial. */}
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b-[6px] border-tinta pb-3 pt-5">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-jacaranda">GymOS</p>
-          <h1 className="text-3xl font-extrabold text-bosque">{datos.gimnasio.nombre}</h1>
-          <p className="text-tinta-suave">{datos.gimnasio.ciudad} · hoy es {datos.hoyTexto}</p>
+          <p className="text-sm font-semibold text-tinta-suave">
+            <span className="marcador-fino mr-2 text-lg text-azul">GymOS</span>
+            {datos.gimnasio.ciudad}, {datos.hoyTexto}
+          </p>
+          <h1 className="marcador mt-1 text-[clamp(3.5rem,11vw,8.5rem)]">{datos.gimnasio.nombre}</h1>
         </div>
-        {datos.modoDemo && <span className="rounded-full bg-ambar/15 px-3 py-1 text-sm font-medium text-ambar">Modo demo · socios ficticios</span>}
+        {datos.modoDemo && <span className="bg-tinta px-3 py-1 text-sm font-semibold text-hormigon-claro">Modo demo con socios ficticios</span>}
       </header>
 
       {!datos.modoDemo && <ClaveAcceso token={token} onCambio={setToken} onGuardar={cargar} />}
 
+      {/* Héroe: la puerta del gimnasio. QR que gira con su cronómetro y el marcador del día. */}
+      <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]" aria-label="Acceso y marcador del día">
+        <Recepcion socios={datos.socios} cabeceras={cabeceras} onCambio={cargar} />
+        <dl className="grid grid-cols-2 content-start gap-x-6 gap-y-5">
+          <div className="col-span-2 border-b-2 border-tinta/25 pb-4">
+            <dt className="font-semibold text-tinta-suave">Socios activos</dt>
+            <dd className="marcador text-[clamp(6rem,18vw,13rem)]">{datos.resumen.socios}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-tinta-suave">Visitas hoy</dt>
+            <dd className="marcador text-[clamp(4rem,9vw,7rem)] text-azul">{datos.resumen.visitasHoy}</dd>
+          </div>
+          <div className={`px-3 pb-1 pt-2 ${datos.resumen.riesgoAlto > 0 ? "bg-naranja" : ""}`}>
+            <dt className="font-semibold">Riesgo alto de baja</dt>
+            <dd className="marcador text-[clamp(4rem,9vw,7rem)]">{datos.resumen.riesgoAlto}</dd>
+          </div>
+          <div className="col-span-2 flex items-baseline gap-3 border-t-2 border-tinta/25 pt-3">
+            <dd className="marcador order-2 text-5xl">{datos.resumen.riesgoMedio}</dd>
+            <dt className="order-1 font-semibold text-tinta-suave">Riesgo medio</dt>
+          </div>
+        </dl>
+      </section>
+
       {datos.modoDemo && (
-        <section aria-labelledby="t-tiempo" className="mt-5 rounded-2xl bg-bosque p-4 text-papel">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 id="t-tiempo" className="text-lg font-bold">Máquina del tiempo</h2>
-              <p className="text-sm text-papel/80">Avanza el calendario y mira cómo el radar detecta a quien empieza a faltar.</p>
+        <section aria-labelledby="t-tiempo" className="sobre-oscuro mt-8 bg-asfalto px-4 py-5 text-hormigon-claro sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-xl">
+              <h2 id="t-tiempo" className="marcador text-5xl">Máquina del tiempo</h2>
+              <p className="mt-2 text-hormigon">Avanza el calendario y mira cómo el radar detecta a quien empieza a faltar.</p>
             </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setReproduciendo((r) => !r)} className="rounded-lg bg-jacaranda px-4 py-2 font-semibold text-white hover:opacity-90" aria-pressed={reproduciendo}>
-                {reproduciendo ? "Pausar" : semanaActual >= 6 ? "Fin del recorrido" : "▶ Avanzar semanas"}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setReproduciendo((r) => !r)} className="bg-naranja px-5 py-3 font-bold text-tinta hover:bg-hormigon-claro" aria-pressed={reproduciendo}>
+                {reproduciendo ? "Pausar" : semanaActual >= 6 ? "Fin del recorrido" : "Avanzar semanas"}
               </button>
-              <button type="button" onClick={() => { setReproduciendo(false); accion("/api/demo/reiniciar"); }} className="rounded-lg border border-papel/40 px-4 py-2 font-semibold hover:bg-bosque-claro">
+              <button type="button" onClick={() => { setReproduciendo(false); accion("/api/demo/reiniciar"); }} className="border-2 border-hormigon-medio px-5 py-3 font-bold hover:bg-asfalto-claro">
                 Reiniciar demo
               </button>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-7 gap-1" role="group" aria-label="Semana de la demo">
+          {/* Pista de atletismo: siete calles, una por semana. */}
+          <div className="mt-5 grid grid-cols-7" role="group" aria-label="Semana de la demo">
             {SEMANAS.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => { setReproduciendo(false); viajar(s); }}
                 aria-current={s === semanaActual}
-                className={`rounded-md px-1 py-2 text-xs font-semibold sm:text-sm ${s === semanaActual ? "bg-papel text-bosque" : s < semanaActual ? "bg-bosque-claro" : "bg-bosque-claro/40 hover:bg-bosque-claro"}`}
+                className={`group relative border-l-2 border-hormigon-medio/40 px-2 pb-2 pt-6 text-left first:border-l-0 ${s <= semanaActual ? "text-hormigon-claro" : "text-hormigon-medio hover:text-hormigon-claro"}`}
               >
-                {s === 0 ? "Hoy" : `+${s} sem`}
+                <span className={`absolute inset-x-0 top-0 h-2 transition-all duration-500 ${s < semanaActual ? "bg-azul" : s === semanaActual ? "bg-naranja" : "bg-asfalto-claro"}`} aria-hidden />
+                <span className="marcador block text-3xl sm:text-5xl">{s === 0 ? "Hoy" : `+${s}`}</span>
+                <span className="sr-only text-xs sm:not-sr-only sm:block">{s === 0 ? " " : s === 1 ? "semana" : "semanas"}</span>
               </button>
             ))}
           </div>
         </section>
       )}
 
-      <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Cifra titulo="Socios activos" valor={datos.resumen.socios} />
-        <Cifra titulo="Riesgo alto" valor={datos.resumen.riesgoAlto} destacado={datos.resumen.riesgoAlto > 0} />
-        <Cifra titulo="Riesgo medio" valor={datos.resumen.riesgoMedio} />
-        <Cifra titulo="Visitas hoy" valor={datos.resumen.visitasHoy} />
-      </dl>
+      <p role="status" aria-live="polite" className="mt-3 min-h-6 font-semibold text-naranja-texto">{error}</p>
 
-      <p role="status" aria-live="polite" className="mt-3 min-h-6 text-sm text-alerta">{error}</p>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <section aria-labelledby="t-radar" className="rounded-2xl border border-salvia-borde bg-white p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="t-radar" className="text-xl font-bold text-bosque">Radar de bajas</h2>
-            <button type="button" onClick={() => setVerTodos((v) => !v)} className="text-sm font-medium text-jacaranda underline-offset-2 hover:underline">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <section aria-labelledby="t-radar">
+          <div className="flex flex-wrap items-end justify-between gap-2 border-b-[6px] border-tinta pb-2">
+            <h2 id="t-radar" className="marcador text-6xl">Radar de bajas</h2>
+            <button type="button" onClick={() => setVerTodos((v) => !v)} className="font-semibold text-azul underline decoration-2 underline-offset-4 hover:text-tinta">
               {verTodos ? "Ver solo en riesgo" : `Ver a todos (${datos.radar.length})`}
             </button>
           </div>
-          <p className="text-sm text-tinta-suave">Quién está dejando de venir, por qué, y un mensaje listo para escribirle uno a uno.</p>
-          {visibles.length === 0 && <p className="mt-4 text-tinta-suave">Nadie en riesgo esta semana.</p>}
-          <ul className="mt-3 space-y-2">
+          <p className="mt-2 max-w-prose text-tinta-suave">Quién está dejando de venir, por qué, y un mensaje listo para escribirle uno a uno.</p>
+          {visibles.length === 0 && <p className="mt-6 text-lg font-semibold">Nadie en riesgo esta semana.</p>}
+          <ul className="mt-3">
             {visibles.map((r) => (
               <FilaSocio
                 key={r.socioId}
@@ -202,43 +229,48 @@ export function Panel() {
           </ul>
         </section>
 
-        <div className="space-y-6">
-          <Recepcion socios={datos.socios} cabeceras={cabeceras} onCambio={cargar} />
-          <section aria-labelledby="t-cobros" className="rounded-2xl border border-salvia-borde bg-white p-4">
-            <h2 id="t-cobros" className="text-xl font-bold text-bosque">Cuotas por cobrar</h2>
-            {datos.porCobrar.length === 0 && <p className="mt-2 text-sm text-tinta-suave">No hay cuotas por vencer.</p>}
-            <ul className="mt-2 divide-y divide-salvia">
-              {datos.porCobrar.slice(0, 8).map((c) => (
-                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <span className="flex flex-col items-start gap-0.5">
-                    <span className="font-medium">{c.nombre}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${c.estado === "vencida" || c.estado === "en_gracia" ? "bg-alerta/10 text-alerta" : "bg-ambar/15 text-ambar"}`}>{textoCuota[c.estado]} · {c.vencimiento.split("-").reverse().join("/")}</span>
-                  </span>
-                  <button type="button" onClick={() => accion(`/api/socios/${encodeURIComponent(c.id)}/renovar`, { planId: c.planId })} className="shrink-0 rounded-lg border border-bosque px-3 py-1 font-semibold text-bosque hover:bg-salvia">
-                    Cobrar y renovar
-                  </button>
-                  {datos.integraciones.mercadoPago && (
-                    <button type="button" onClick={() => linkDePago(c.id, c.planId)} className="shrink-0 rounded-lg bg-jacaranda px-3 py-1 font-semibold text-white hover:opacity-90">
-                      Link de pago
+        <div className="space-y-8">
+          <section aria-labelledby="t-cobros" className="losa p-4">
+            <h2 id="t-cobros" className="marcador text-4xl">Cuotas por cobrar</h2>
+            {datos.porCobrar.length === 0 && <p className="mt-2 text-tinta-suave">No hay cuotas por vencer.</p>}
+            <ul className="mt-2 divide-y-2 divide-hormigon">
+              {datos.porCobrar.slice(0, 8).map((c) => {
+                const urgente = c.estado === "vencida" || c.estado === "en_gracia";
+                return (
+                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                    <span className="flex min-w-0 flex-col">
+                      <span className="font-semibold">{c.nombre}</span>
+                      <span className={`text-sm font-medium ${urgente ? "text-naranja-texto" : "text-tinta-suave"}`}>{textoCuota[c.estado]}, vence el {fecha(c.vencimiento)}</span>
+                    </span>
+                    <button type="button" onClick={() => accion(`/api/socios/${encodeURIComponent(c.id)}/renovar`, { planId: c.planId })} className="shrink-0 border-2 border-tinta px-3 py-1.5 text-sm font-bold hover:bg-tinta hover:text-hormigon-claro">
+                      Cobrar y renovar
                     </button>
-                  )}
-                  {enlacePago?.id === c.id && (
-                    <a href={enlacePago.url} target="_blank" rel="noopener noreferrer" className="basis-full break-all text-xs text-jacaranda underline">{enlacePago.url}</a>
-                  )}
-                </li>
-              ))}
+                    {datos.integraciones.mercadoPago && (
+                      <button type="button" onClick={() => linkDePago(c.id, c.planId)} className="shrink-0 bg-azul px-3 py-1.5 text-sm font-bold text-white hover:bg-tinta">
+                        Link de pago
+                      </button>
+                    )}
+                    {enlacePago?.id === c.id && (
+                      <a href={enlacePago.url} target="_blank" rel="noopener noreferrer" className="basis-full break-all text-xs text-azul underline">{enlacePago.url}</a>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
-          <section aria-labelledby="t-ranking" className="rounded-2xl border border-salvia-borde bg-white p-4">
-            <h2 id="t-ranking" className="text-xl font-bold text-bosque">Ranking del mes</h2>
-            <p className="text-sm text-tinta-suave">Por constancia, no por fuerza. Solo quien aceptó salir, con su apodo.</p>
-            <ol className="mt-2 space-y-1">
+
+          <section aria-labelledby="t-ranking">
+            <h2 id="t-ranking" className="marcador border-b-[6px] border-tinta pb-2 text-4xl">Ranking del mes</h2>
+            <p className="mt-2 text-sm text-tinta-suave">Por constancia, no por fuerza. Solo quien aceptó salir, con su apodo.</p>
+            <ol className="mt-3">
               {datos.ranking.map((f) => (
-                <li key={f.socioId} className="flex items-center gap-3 text-sm">
-                  <span className={`cifra grid h-7 w-7 place-items-center rounded-full font-bold ${f.posicion <= 3 ? "bg-jacaranda text-white" : "bg-salvia"}`}>{f.posicion}</span>
-                  <span className="flex-1 font-medium">{f.apodo}</span>
-                  <span className="text-tinta-suave">{f.visitas} visitas{f.mejorRacha > 1 ? ` · racha ${f.mejorRacha} sem` : ""}</span>
-                  <span className="cifra w-12 text-right font-bold text-bosque">{f.puntos}</span>
+                <li key={f.socioId} className={`flex items-center gap-3 border-b border-tinta/15 py-1.5 ${f.posicion === 1 ? "bg-azul px-2 text-white" : ""}`}>
+                  <span className={`marcador w-10 shrink-0 text-right ${f.posicion <= 3 ? "text-5xl" : "text-3xl text-tinta-suave"} ${f.posicion === 1 ? "text-white" : ""}`}>{f.posicion}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{f.apodo}</span>
+                    <span className={`text-xs ${f.posicion === 1 ? "text-white/85" : "text-tinta-suave"}`}>{f.visitas} visitas{f.mejorRacha > 1 ? `, racha de ${f.mejorRacha} semanas` : ""}</span>
+                  </span>
+                  <span className="marcador-fino text-3xl" aria-label={`${f.puntos} puntos`}>{f.puntos}</span>
                 </li>
               ))}
             </ol>
@@ -248,19 +280,10 @@ export function Panel() {
 
       <Rutinas cabeceras={cabeceras} alGenerar={(r: Rutina | null, e?: string) => (e ? setError(e) : r && setError(null))} />
 
-      <footer className="mt-10 border-t border-salvia-borde pt-4 text-xs text-tinta-suave">
-        GymOS · Fábrica. Los mensajes se envían a mano, de uno en uno. {datos.modoDemo ? "Datos ficticios de demostración." : ""}
+      <footer className="mt-12 border-t-2 border-tinta/25 pt-4 text-sm text-tinta-suave">
+        GymOS, de la Fábrica. Los mensajes se envían a mano, de uno en uno. {datos.modoDemo ? "Datos ficticios de demostración." : ""}
       </footer>
     </main>
-  );
-}
-
-function Cifra({ titulo, valor, destacado }: { titulo: string; valor: number; destacado?: boolean }) {
-  return (
-    <div className={`rounded-2xl border p-3 ${destacado ? "border-alerta/40 bg-alerta/5" : "border-salvia-borde bg-white"}`}>
-      <dt className="text-sm text-tinta-suave">{titulo}</dt>
-      <dd className={`cifra text-3xl font-extrabold ${destacado ? "text-alerta" : "text-bosque"}`}>{valor}</dd>
-    </div>
   );
 }
 
@@ -268,46 +291,51 @@ function FilaSocio({ r, abierto, recien, onAbrir, onEnviado, onPlantilla }: { r:
   const e = estiloNivel[r.nivel];
   const idDetalle = `detalle-${r.socioId}`;
   return (
-    <li className={`rounded-xl border border-salvia-borde p-3 transition-colors ${recien ? "recien" : ""}`}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-semibold">{r.nombre}</span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${e.chip}`}>{e.texto}</span>
-        <span className="text-xs text-tinta-suave">{r.plan} · cuota {textoCuota[r.estadoCuota].toLowerCase()}</span>
-        <span className="cifra ml-auto text-xl font-bold" aria-label={`Riesgo ${r.score} de 100`}>{r.score}</span>
+    <li className={`relative border-b-2 border-tinta/15 py-3 pl-5 ${recien ? "recien" : ""}`}>
+      <span className={`absolute inset-y-2 left-0 w-2 ${e.franja}`} aria-hidden />
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-baseline gap-x-3">
+            <span className="text-lg font-bold">{r.nombre}</span>
+            <span className="text-sm font-semibold">{e.texto}</span>
+          </p>
+          <p className="text-sm text-tinta-suave">{r.plan}, cuota {textoCuota[r.estadoCuota].toLowerCase()}</p>
+          {r.senales.length > 0 && <p className="mt-1">{r.senales[0].texto}</p>}
+          {r.nivel === "sin_datos" && <p className="mt-1 text-tinta-suave">Aún no hay historial suficiente para saber qué es lo habitual en este socio.</p>}
+        </div>
+        <span className={`marcador shrink-0 text-6xl ${e.cifra}`} aria-label={`Riesgo ${r.score} de 100`}>{r.score}</span>
       </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-salvia" aria-hidden>
-        <div className={`h-full rounded-full ${e.barra} transition-all duration-700`} style={{ width: `${Math.max(r.score, 2)}%` }} />
+      <div className="mt-2 h-1.5 bg-tinta/10" aria-hidden>
+        <div className={`h-full ${e.barra} transition-all duration-700`} style={{ width: `${Math.max(r.score, 2)}%` }} />
       </div>
-      {r.senales.length > 0 && <p className="mt-2 text-sm">{r.senales[0].texto}</p>}
-      {r.nivel === "sin_datos" && <p className="mt-2 text-sm text-tinta-suave">Aún no hay historial suficiente para saber qué es lo habitual en este socio.</p>}
       {(r.nivel === "alto" || r.nivel === "medio") && (
-        <div className="mt-2">
+        <div className="mt-3">
           {r.mensaje ? (
-            <button type="button" onClick={onAbrir} aria-expanded={abierto} aria-controls={idDetalle} className="rounded-lg bg-bosque px-3 py-1.5 text-sm font-semibold text-papel hover:bg-bosque-claro">
+            <button type="button" onClick={onAbrir} aria-expanded={abierto} aria-controls={idDetalle} className="bg-tinta px-4 py-2 text-sm font-bold text-hormigon-claro hover:bg-azul">
               {abierto ? "Ocultar mensaje" : "Preparar WhatsApp"}
             </button>
           ) : (
-            <p className="text-sm text-tinta-suave">{r.ultimoContacto ? `Mensaje enviado el ${r.ultimoContacto.split("-").reverse().join("/")}.` : !r.permiso.ok ? r.permiso.motivo : ""}</p>
+            <p className="text-sm text-tinta-suave">{r.ultimoContacto ? `Mensaje enviado el ${fecha(r.ultimoContacto)}.` : !r.permiso.ok ? r.permiso.motivo : ""}</p>
           )}
         </div>
       )}
       {abierto && r.mensaje && (
-        <div id={idDetalle} className="fondo-chat mt-3 rounded-xl p-3">
+        <div id={idDetalle} className="aparece mt-3 bg-asfalto p-4 text-hormigon-claro sobre-oscuro">
           {r.senales.length > 1 && (
-            <ul className="mb-2 list-inside list-disc text-xs text-tinta-suave">
-              {r.senales.map((s) => <li key={s.id}>{s.texto} (+{s.puntos})</li>)}
+            <ul className="mb-3 space-y-0.5 text-sm text-hormigon">
+              {r.senales.map((s) => <li key={s.id}><span className="marcador-fino mr-2 text-xl text-naranja">+{s.puntos}</span>{s.texto}</li>)}
             </ul>
           )}
-          <p className="max-w-prose rounded-xl rounded-tr-sm bg-burbuja p-3 text-sm shadow-sm">{r.mensaje.texto}</p>
+          <p className="max-w-prose border-l-4 border-naranja bg-asfalto-claro p-3">{r.mensaje.texto}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <a href={r.mensaje.enlace} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-[#1f7a4d] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">
+            <a href={r.mensaje.enlace} target="_blank" rel="noopener noreferrer" className="bg-acceso px-4 py-2 text-sm font-bold text-white hover:bg-white hover:text-tinta">
               Abrir WhatsApp
             </a>
-            <button type="button" onClick={onEnviado} className="rounded-lg border border-bosque bg-white px-3 py-1.5 text-sm font-semibold text-bosque hover:bg-salvia">
+            <button type="button" onClick={onEnviado} className="border-2 border-hormigon-medio px-4 py-2 text-sm font-bold hover:bg-asfalto-claro">
               Marcar como enviado
             </button>
             {onPlantilla && (
-              <button type="button" onClick={onPlantilla} className="rounded-lg border border-bosque bg-white px-3 py-1.5 text-sm font-semibold text-bosque hover:bg-salvia">
+              <button type="button" onClick={onPlantilla} className="border-2 border-hormigon-medio px-4 py-2 text-sm font-bold hover:bg-asfalto-claro">
                 Enviar plantilla aprobada por la API
               </button>
             )}
@@ -318,19 +346,44 @@ function FilaSocio({ r, abierto, recien, onAbrir, onEnviado, onPlantilla }: { r:
   );
 }
 
+/** La puerta del gimnasio: QR del socio que gira cada minuto con su cronómetro, y el escáner de la entrada. */
 function Recepcion({ socios, cabeceras, onCambio }: { socios: { id: string; nombre: string }[]; cabeceras: () => HeadersInit; onCambio: () => void }) {
   const [socioId, setSocioId] = useState("martina-rojas");
   const [qr, setQr] = useState<Qr | null>(null);
+  const [vuelta, setVuelta] = useState(0);
+  const [restante, setRestante] = useState(0);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [cargando, setCargando] = useState(false);
 
-  async function mostrarQr() {
-    setDecision(null);
-    const res = await fetch(`/api/socios/${encodeURIComponent(socioId)}/qr`, { headers: cabeceras() });
-    const json = await res.json().catch(() => ({}));
-    setQr(res.ok ? json : null);
-    if (!res.ok) setDecision({ permitido: false, mensaje: json.error ?? "No se pudo generar el QR." });
-  }
+  // Carga el QR del socio elegido y lo renueva solo cuando caduca (cada 60 s).
+  useEffect(() => {
+    let vivo = true;
+    let temporizador: ReturnType<typeof setTimeout>;
+    async function cargarQr() {
+      const res = await fetch(`/api/socios/${encodeURIComponent(socioId)}/qr`, { headers: cabeceras() });
+      const json = await res.json().catch(() => ({}));
+      if (!vivo) return;
+      if (!res.ok) {
+        setQr(null);
+        setDecision({ permitido: false, mensaje: json.error ?? "No se pudo generar el QR." });
+        return;
+      }
+      setQr(json);
+      setVuelta((v) => v + 1);
+      setRestante(json.caducaEnSeg);
+      temporizador = setTimeout(cargarQr, json.caducaEnSeg * 1000 + 300);
+    }
+    cargarQr();
+    return () => {
+      vivo = false;
+      clearTimeout(temporizador);
+    };
+  }, [socioId, cabeceras]);
+
+  useEffect(() => {
+    const t = setInterval(() => setRestante((r) => Math.max(0, r - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   async function escanear() {
     if (!qr) return;
@@ -343,36 +396,50 @@ function Recepcion({ socios, cabeceras, onCambio }: { socios: { id: string; nomb
   }
 
   return (
-    <section aria-labelledby="t-recepcion" className="rounded-2xl border border-salvia-borde bg-white p-4">
-      <h2 id="t-recepcion" className="text-xl font-bold text-bosque">Recepción · acceso con QR</h2>
-      <p className="text-sm text-tinta-suave">El QR del socio cambia cada minuto: una captura de pantalla no sirve.</p>
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="flex min-w-0 flex-1 flex-col text-sm font-medium">
-          Socio
-          <select value={socioId} onChange={(e) => { setSocioId(e.target.value); setQr(null); setDecision(null); }} className="mt-1 rounded-lg border border-salvia-borde bg-papel px-3 py-2">
-            {socios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-          </select>
-        </label>
-        <button type="button" onClick={mostrarQr} className="rounded-lg border border-bosque px-3 py-2 text-sm font-semibold text-bosque hover:bg-salvia">Ver su QR</button>
+    <section aria-labelledby="t-recepcion" className="sobre-oscuro bg-asfalto p-4 text-hormigon-claro sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="t-recepcion" className="marcador text-4xl">Acceso con QR</h2>
+        <p className="text-sm text-hormigon">Cambia cada minuto: una captura no sirve.</p>
       </div>
-      {qr && (
-        <div className="mt-3 flex items-center gap-4">
-          {/* SVG generado en nuestro servidor por la librería qrcode a partir de un código firmado. */}
-          <div className="h-32 w-32 shrink-0 rounded-lg border border-salvia-borde bg-white p-1" aria-label={`Código QR de ${qr.nombre}`} role="img" dangerouslySetInnerHTML={{ __html: qr.svg }} />
-          <div className="space-y-2 text-sm">
-            <a href={`/socio/${encodeURIComponent(socioId)}`} target="_blank" className="block text-jacaranda underline-offset-2 hover:underline">Abrir la vista del socio</a>
-            <button type="button" onClick={escanear} disabled={cargando} className="rounded-lg bg-bosque px-4 py-2 font-semibold text-papel hover:bg-bosque-claro disabled:opacity-70">
-              {cargando ? "Validando…" : "Escanear en la entrada"}
-            </button>
-          </div>
+      <div className="mt-4 grid items-center gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+        <div className="relative mx-auto w-full max-w-[22rem]">
+          <Cronometro restante={qr ? restante : 0} total={VALIDEZ_QR}>
+            {qr ? (
+              /* SVG generado en nuestro servidor por la librería qrcode a partir de un código firmado. */
+              <div key={vuelta} className="gira aspect-square w-full bg-white p-2" role="img" aria-label={`Código QR de ${qr.nombre}`} dangerouslySetInnerHTML={{ __html: qr.svg }} />
+            ) : (
+              <div className="aspect-square w-full bg-asfalto-claro" />
+            )}
+          </Cronometro>
+          {decision && (
+            <div aria-hidden className={`golpe absolute inset-[13%] grid place-items-center ${decision.permitido ? "bg-acceso" : "bg-naranja text-tinta"}`}>
+              <span className="marcador text-[clamp(4rem,14vw,8rem)]">{decision.permitido ? "Pasa" : "Alto"}</span>
+            </div>
+          )}
         </div>
-      )}
+        <div className="space-y-4">
+          <p aria-live="off">
+            <span className="marcador block text-8xl tabular-nums">{qr ? restante : "--"}</span>
+            <span className="text-sm text-hormigon">segundos para que el código cambie</span>
+          </p>
+          <label className="flex flex-col text-sm font-semibold">
+            Socio en la puerta
+            <select value={socioId} onChange={(e) => { setSocioId(e.target.value); setDecision(null); }} className="mt-1 border-2 border-hormigon-medio bg-asfalto-claro px-3 py-2 text-base text-hormigon-claro">
+              {socios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={escanear} disabled={cargando || !qr} className="w-full bg-azul px-4 py-3 text-lg font-bold text-white hover:bg-hormigon-claro hover:text-tinta disabled:opacity-60">
+            {cargando ? "Validando…" : "Escanear en la entrada"}
+          </button>
+          {decision && <button type="button" onClick={() => setDecision(null)} className="w-full border-2 border-hormigon-medio px-4 py-2 text-sm font-bold hover:bg-asfalto-claro">Volver a ver el QR</button>}
+          <a href={`/socio/${encodeURIComponent(socioId)}`} target="_blank" className="inline-block text-sm font-semibold text-azul-claro underline decoration-2 underline-offset-4 hover:text-white">Abrir la vista del socio en el móvil</a>
+        </div>
+      </div>
       <div aria-live="assertive">
         {decision && (
-          <div className={`aparece mt-3 rounded-xl p-4 text-center text-lg font-bold ${decision.permitido ? "bg-[#1f7a4d] text-white" : "bg-alerta text-white"}`}>
-            <span aria-hidden className="mr-2">{decision.permitido ? "✓" : "✕"}</span>
+          <p className={`golpe mt-4 px-4 py-3 text-lg font-bold ${decision.permitido ? "bg-acceso text-white" : "bg-naranja text-tinta"}`}>
             {decision.mensaje}
-          </div>
+          </p>
         )}
       </div>
     </section>
@@ -389,11 +456,11 @@ function ClaveAcceso({ token, onCambio, onGuardar }: { token: string; onCambio: 
       }}
       className="mt-4 flex flex-wrap items-end gap-2"
     >
-      <label className="flex flex-col text-sm font-medium">
+      <label className="flex flex-col text-sm font-semibold">
         Clave de acceso
-        <input type="password" autoComplete="current-password" value={token} onChange={(e) => onCambio(e.target.value)} className="mt-1 rounded-lg border border-salvia-borde bg-white px-3 py-2" />
+        <input type="password" autoComplete="current-password" value={token} onChange={(e) => onCambio(e.target.value)} className="mt-1 border-2 border-tinta bg-hormigon-claro px-3 py-2" />
       </label>
-      <button type="submit" className="rounded-lg bg-bosque px-4 py-2 font-semibold text-papel">Entrar</button>
+      <button type="submit" className="bg-tinta px-4 py-2.5 font-bold text-hormigon-claro">Entrar</button>
     </form>
   );
 }

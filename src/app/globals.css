@@ -1,49 +1,60 @@
 @import "tailwindcss";
 
-/* Paleta de la Fábrica (compartida con Recepción 24/7): papel, bosque y jacarandá. */
+/* GymOS: gris hormigón, azul eléctrico y naranja de seguridad. Identidad propia, no compartida con las otras apps. */
 @theme {
-  --color-papel: #f5f6f2;
-  --color-tinta: #18221e;
-  --color-tinta-suave: #4b5a53;
-  --color-bosque: #1e4a3b;
-  --color-bosque-claro: #2f6b55;
-  --color-salvia: #dce7df;
-  --color-salvia-borde: #c3d3c8;
-  --color-jacaranda: #7b5cc4;
-  --color-jacaranda-claro: #ece6fa;
-  --color-burbuja: #d9f3d0;
-  --color-alerta: #a8431f;
-  --color-ambar: #855b00;
-  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --color-hormigon: #c9cac5;
+  --color-hormigon-claro: #e4e5e0;
+  --color-hormigon-medio: #a3a5a0;
+  --color-asfalto: #2a2d30;
+  --color-asfalto-claro: #3d4145;
+  --color-tinta: #16181a;
+  --color-tinta-suave: #45494d;
+  --color-azul: #1340ff;
+  --color-azul-claro: #8fa6ff;
+  --color-naranja: #ff5c1a;
+  --color-naranja-texto: #a93900;
+  --color-acceso: #0f7a45;
+  --font-sans: var(--font-texto), ui-sans-serif, system-ui, sans-serif;
+  --font-marcador: var(--font-marcador), "Arial Narrow", sans-serif;
 }
 
-html { background: var(--color-papel); color: var(--color-tinta); }
-body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
-h1, h2 { font-variation-settings: "opsz" 48; }
-
-:focus-visible { outline: 2px solid var(--color-jacaranda); outline-offset: 2px; border-radius: 4px; }
-
-.cifra { font-family: var(--font-cifras), var(--font-bricolage), sans-serif; font-variation-settings: "wdth" 75; font-feature-settings: "tnum"; letter-spacing: -0.02em; }
-
-.fondo-chat {
-  background-color: var(--color-salvia);
-  background-image: radial-gradient(rgb(30 74 59 / 0.07) 1px, transparent 1px);
-  background-size: 14px 14px;
+html {
+  color: var(--color-tinta);
+  background-color: var(--color-hormigon);
+  /* Grano de hormigón: ruido SVG en línea (data:, permitido por la CSP). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
+body { font-family: var(--font-sans); font-variation-settings: "wdth" 92; -webkit-font-smoothing: antialiased; }
 
-/* Animación del barrido. */
-@keyframes barrido { to { transform: rotate(360deg); } }
-.barrido { animation: barrido 1.4s linear infinite; transform-origin: 50% 50%; }
+/* Cifras y títulos de marcador: condensados, pesados y con cifras tabulares. */
+.marcador { font-family: var(--font-marcador); font-weight: 900; line-height: 0.82; letter-spacing: -0.01em; font-feature-settings: "tnum"; }
+.marcador-fino { font-family: var(--font-marcador); font-weight: 700; line-height: 0.9; font-feature-settings: "tnum"; }
+
+:focus-visible { outline: 3px solid var(--color-azul); outline-offset: 3px; }
+.sobre-oscuro :focus-visible { outline-color: var(--color-naranja); }
+
+/* Losa: superficie de trabajo, sin sombra ni esquinas suaves; el peso lo da el borde inferior. */
+.losa { background: var(--color-hormigon-claro); border-bottom: 6px solid var(--color-tinta); }
+
+/* Bisel del cronómetro alrededor del QR. */
+.bisel-marca { transition: stroke 0.25s linear; }
+
+/* El QR gira sobre sí mismo cada vez que se renueva (cada 60 s). */
+@keyframes gira { from { transform: perspective(700px) rotateY(-180deg); } to { transform: perspective(700px) rotateY(0); } }
+.gira { animation: gira 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); backface-visibility: hidden; }
+
+/* Resultado del escaneo: entra de golpe, como un semáforo. */
+@keyframes golpe { from { transform: scale(1.08); opacity: 0; } to { transform: none; opacity: 1; } }
+.golpe { animation: golpe 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+/* Un socio que acaba de entrar en riesgo: su franja se enciende. */
+@keyframes enciende { 0%, 100% { background-color: transparent; } 30% { background-color: rgb(255 92 26 / 0.28); } }
+.recien { animation: enciende 1.4s ease-out 2; }
+
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+.aparece { animation: aparece 0.35s ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
-  .barrido { animation: none; }
-}
-
-/* Resalta lo que acaba de cambiar (un socio que entra en el radar, el resultado de un escaneo). */
-@keyframes aparece { from { opacity: 0.2; transform: scale(0.97); } to { opacity: 1; transform: none; } }
-.aparece { animation: aparece 0.5s ease-out; }
-@keyframes recien { from { box-shadow: 0 0 0 4px rgb(168 67 31 / 0.55); } to { box-shadow: 0 0 0 0 rgb(168 67 31 / 0); } }
-.recien { animation: recien 1.6s ease-out 2; }
-@media (prefers-reduced-motion: reduce) {
-  .aparece, .recien { animation: none; }
+  .gira, .golpe, .recien, .aparece { animation: none; }
+  .bisel-marca, .transition-all { transition: none; }
 }
